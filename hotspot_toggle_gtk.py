@@ -21,7 +21,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, Gtk, GdkPixbuf  # noqa: E402
+gi.require_version("Gdk", "4.0")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GdkPixbuf  # noqa: E402
 
 import create_ap_helper as hotspot  # noqa: E402
 
@@ -85,8 +86,12 @@ class QrDialog(Adw.Window):
             loader = GdkPixbuf.PixbufLoader()
             loader.write(png_bytes)
             loader.close()
-            picture = Gtk.Picture.new_for_pixbuf(loader.get_pixbuf())
+            pixbuf = loader.get_pixbuf()
+            texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+            picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+            picture.set_size_request(240, 240)
+            picture.set_can_shrink(False)
             self._box.append(picture)
         else:
             label = Gtk.Label(
@@ -104,12 +109,14 @@ class QrDialog(Adw.Window):
 
 class HotspotWindow(Adw.ApplicationWindow):
     def __init__(self, app: "HotspotApp"):
-        super().__init__(application=app, title="Hotspot", default_width=420, default_height=640)
+        super().__init__(application=app, title="Hotspot", default_width=460, default_height=680)
         self.settings = app.settings
 
         toolbar_view = Adw.ToolbarView()
         self.set_content(toolbar_view)
-        toolbar_view.add_top_bar(Adw.HeaderBar())
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title="Hotspot"))
+        toolbar_view.add_top_bar(header)
 
         self.toast_overlay = Adw.ToastOverlay()
         toolbar_view.set_content(self.toast_overlay)
@@ -258,7 +265,8 @@ class HotspotWindow(Adw.ApplicationWindow):
         # ---- Apply ----
         apply_group = Adw.PreferencesGroup(
             description="Changes take effect next time you turn the hotspot on. "
-                        'Use "Apply Now" to restart it immediately.')
+                        'If it\'s already on, use "Apply Now" to restart it immediately '
+                        "with the new settings.")
         page.add(apply_group)
         apply_row = Adw.ActionRow(title="Apply changes to the running hotspot")
         self.apply_btn = Gtk.Button(label="Apply Now", valign=Gtk.Align.CENTER,
@@ -321,16 +329,22 @@ class HotspotWindow(Adw.ApplicationWindow):
     # ---- power switch ----
 
     def _on_power_switch(self, switch, state):
-        # GtkSwitch's 'state-set' fires for both user clicks and
-        # programmatic set_active() calls; refresh() uses
-        # _suppress_switch_signal to tell them apart so polling can never
-        # cascade into an unwanted restart.
+        # GtkSwitch has two separate properties: `active` (thumb position,
+        # updates immediately on click/drag) and `state` (drives the lit/
+        # unlit color, and is what this signal is actually about). Because
+        # we override the default handling here (to make async start/stop
+        # safe), we're responsible for confirming `state` ourselves via
+        # set_state() in every code path below — GTK will NOT do it for us
+        # once we return True. Skipping that in an earlier version is what
+        # caused the switch to show the wrong lit/unlit color.
         if self._suppress_switch_signal:
-            return False  # allow the default state change, do nothing else
+            return False  # programmatic sync from refresh(); let the default handler run
         if self._busy:
-            return True  # veto the change until the current action finishes
+            switch.set_state(self._last_known_active)  # keep it visually pinned to the real state
+            return True
         if state == self._last_known_active:
-            return False  # already in that state, nothing to do
+            switch.set_state(state)
+            return True
 
         self._busy = True
         self.power_row.set_subtitle("Working…")
@@ -340,14 +354,15 @@ class HotspotWindow(Adw.ApplicationWindow):
             if not ifname:
                 self._busy = False
                 self._toast("No WiFi interface found")
-                return True  # veto, snap switch back
+                switch.set_state(self._last_known_active)
+                return True
             opts = self._build_start_options(ifname)
             run_async(lambda: hotspot.start(opts), self._on_action_done, self._on_action_error)
         else:
             ifname = self._current_ifname()
             run_async(lambda: hotspot.stop(ifname), self._on_action_done, self._on_action_error)
 
-        return True  # we'll set the final state ourselves once refresh() confirms it
+        return True  # we'll confirm the real state ourselves once refresh() reports back
 
     def _on_action_done(self, _result):
         self._busy = False
@@ -363,6 +378,9 @@ class HotspotWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _on_apply_now(self, _btn):
+        if not self._last_known_active:
+            self._toast("Hotspot is off — turn it on first, then Apply Now restarts it with new settings")
+            return
         ifname = self._current_ifname()
         if not ifname:
             self._toast("No WiFi interface found")
@@ -407,6 +425,7 @@ class HotspotWindow(Adw.ApplicationWindow):
 
         self._suppress_switch_signal = True
         self.power_switch.set_active(status.active)
+        self.power_switch.set_state(status.active)
         self._suppress_switch_signal = False
 
         display_ssid = status.ssid or self.settings.get_string("ssid") or "Hotspot"
