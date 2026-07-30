@@ -54,13 +54,14 @@ sudo dnf install python3-gobject gtk4 libadwaita
 # Arch
 sudo pacman -S python-gobject gtk4 libadwaita
 ```
+
 (libadwaita ≥ 1.4 recommended — the app uses `Adw.EntryRow`,
 `Adw.PasswordEntryRow`, `Adw.SwitchRow`, `Adw.SpinRow`.)
 
 ### 2. create_ap (if not already installed)
 
 ```sh
-git clone https://github.com/oblique/create_ap
+git clone https://github.com/MaouNour/Hotspot-Access-point-On-Linux.git ./create_ap
 cd create_ap
 sudo make install
 ```
