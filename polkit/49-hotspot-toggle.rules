@@ -1,0 +1,16 @@
+// 49-hotspot-toggle.rules
+// Members of the "sudo" or "wheel" group (i.e. the normal admin/local-user
+// group on Debian/Ubuntu or Fedora/Arch respectively) get to run the
+// hotspot helper with no password prompt at all. Everyone else falls back
+// to the .policy defaults (auth_admin — their own password, if they're an
+// admin).
+//
+// This mirrors the polkit setup used by the linux-wifi-hotspot project
+// (org.opensuse.policykit.create-ap) rather than inventing a bespoke group.
+
+polkit.addRule(function(action, subject) {
+    if (action.id == "local.hotspot-toggle.manage") {
+        if (subject.isInGroup("sudo") || subject.isInGroup("wheel"))
+            return polkit.Result.YES;
+    }
+});

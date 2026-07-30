@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="hotspot-toggle">
+  <schema id="io.github.local.hotspot-toggle" path="/io/github/local/hotspot-toggle/">
+
+    <key name="wifi-interface" type="s">
+      <default>''</default>
+      <summary>WiFi interface used to host the hotspot</summary>
+      <description>Empty means auto-detect the first WiFi device.</description>
+    </key>
+
+    <key name="internet-interface" type="s">
+      <default>''</default>
+      <summary>Interface to share internet from</summary>
+      <description>Empty/same as the WiFi interface = classic single-card "AP + client at once" mode. 'none' disables internet sharing. Another interface (e.g. eth0) shares that instead.</description>
+    </key>
+
+    <key name="ssid" type="s">
+      <default>''</default>
+      <summary>Hotspot name (SSID)</summary>
+    </key>
+
+    <key name="password" type="s">
+      <default>''</default>
+      <summary>Hotspot passphrase</summary>
+      <description>WPA/WPA2 passphrase (8-63 chars), or 64 hex-digit raw PSK if psk-mode is enabled.</description>
+    </key>
+
+    <key name="psk-mode" type="b">
+      <default>false</default>
+      <summary>Treat password as a raw 64-hex-digit PSK (create_ap --psk)</summary>
+    </key>
+
+    <key name="hidden" type="b">
+      <default>false</default>
+      <summary>Hide the SSID (create_ap --hidden)</summary>
+    </key>
+
+    <key name="wpa-version" type="s">
+      <default>'2'</default>
+      <summary>WPA version</summary>
+      <description>'1', '2', or '1+2' — passed straight through to create_ap's -w option.</description>
+    </key>
+
+    <key name="band" type="s">
+      <default>'2.4'</default>
+      <summary>Frequency band</summary>
+      <description>'2.4' or '5' — passed straight through to create_ap's --freq-band.</description>
+    </key>
+
+    <key name="channel" type="i">
+      <default>1</default>
+      <summary>WiFi channel (create_ap -c)</summary>
+    </key>
+
+    <key name="mac-address" type="s">
+      <default>''</default>
+      <summary>Custom MAC address (create_ap --mac)</summary>
+    </key>
+
+    <key name="isolate-clients" type="b">
+      <default>false</default>
+      <summary>Isolate clients from each other (create_ap --isolate-clients)</summary>
+    </key>
+
+    <key name="no-virt" type="b">
+      <default>false</default>
+      <summary>Disable virtual interface (create_ap --no-virt)</summary>
+      <description>Leave this off to keep hosting the hotspot AND staying connected as a WiFi client on the same card at the same time.</description>
+    </key>
+
+    <key name="autostart" type="b">
+      <default>false</default>
+      <summary>Turn hotspot on automatically at login</summary>
+    </key>
+
+  </schema>
+</schemalist>

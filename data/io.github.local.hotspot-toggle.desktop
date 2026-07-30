@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hotspot
+Comment=Turn your WiFi hotspot on/off and configure it
+Exec=hotspot-toggle
+Icon=network-wireless-hotspot-symbolic
+Terminal=false
+Categories=Network;Settings;
+StartupNotify=true
