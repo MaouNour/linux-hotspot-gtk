@@ -12,6 +12,7 @@ transient systemd unit. Status is read live via `systemctl is-active`.
 Subprocess calls run on a background thread pool so the UI never blocks;
 results are marshalled back to the main thread with GLib.idle_add.
 """
+
 from __future__ import annotations
 
 import sys
@@ -36,20 +37,25 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="hotspot-io")
 def run_async(fn, on_done=None, on_error=None):
     """Run fn() on a worker thread; call on_done(result)/on_error(exc) on
     the GTK main thread afterwards."""
+
     def worker():
         try:
             result = fn()
         except Exception as e:  # noqa: BLE001
             if on_error:
+
                 def deliver_error(e=e):
                     on_error(e)
                     return False
+
                 GLib.idle_add(deliver_error)
             return
         if on_done:
+
             def deliver_result(result=result):
                 on_done(result)
                 return False
+
             GLib.idle_add(deliver_result)
 
     _executor.submit(worker)
@@ -57,23 +63,42 @@ def run_async(fn, on_done=None, on_error=None):
 
 class QrDialog(Adw.Window):
     def __init__(self, parent, ssid: str, password: str, hidden: bool):
-        super().__init__(title="Hotspot QR Code", modal=True, transient_for=parent,
-                          default_width=300, default_height=340)
+        super().__init__(
+            title="Hotspot QR Code",
+            modal=True,
+            transient_for=parent,
+            default_width=300,
+            default_height=340,
+        )
 
         self._ssid = ssid
         self._password = password
         self._hidden = hidden
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
-                       margin_top=18, margin_bottom=18, margin_start=18, margin_end=18)
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=12,
+            margin_top=18,
+            margin_bottom=18,
+            margin_start=18,
+            margin_end=18,
+        )
         self.set_content(box)
 
-        spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32,
-                               halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+        spinner = Gtk.Spinner(
+            spinning=True,
+            width_request=32,
+            height_request=32,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+        )
         box.append(spinner)
         self._box = box
         self._spinner = spinner
-
+        self._close_btn = Gtk.Button(label="Close")
+        self._close_btn.set_halign(Gtk.Align.CENTER)
+        self._close_btn.add_css_class("suggested-action")
+        self._close_btn.connect("clicked", lambda *_: self.close())
         text = hotspot.wifi_qr_string(ssid, password, hidden)
         run_async(lambda: hotspot.render_qr_png(text), self._on_png, self._on_png_error)
 
@@ -96,7 +121,7 @@ class QrDialog(Adw.Window):
         else:
             label = Gtk.Label(
                 label='Install "qrencode" to generate a scannable QR code.\n'
-                      'Showing the raw WiFi string instead:',
+                "Showing the raw WiFi string instead:",
                 wrap=True,
             )
             self._box.append(label)
@@ -105,17 +130,23 @@ class QrDialog(Adw.Window):
                 editable=False,
             )
             self._box.append(entry)
+        self._box.append(self._close_btn)
 
 
 class HotspotWindow(Adw.ApplicationWindow):
     def __init__(self, app: "HotspotApp"):
-        super().__init__(application=app, title="Hotspot", default_width=460, default_height=680)
+        super().__init__(
+            application=app, title="Hotspot", default_width=460, default_height=680
+        )
         self.settings = app.settings
 
         toolbar_view = Adw.ToolbarView()
         self.set_content(toolbar_view)
         header = Adw.HeaderBar()
-        header.set_title_widget(Adw.WindowTitle(title="Hotspot"))
+        # header.set_title_widget(Adw.WindowTitle(title="Hotspot"))
+        title = Gtk.Label(label="Hotspot")
+        title.add_css_class("title")
+        header.set_title_widget(title)
         toolbar_view.add_top_bar(header)
 
         self.toast_overlay = Adw.ToastOverlay()
@@ -144,9 +175,16 @@ class HotspotWindow(Adw.ApplicationWindow):
         if not hotspot.is_create_ap_installed() or not hotspot.is_helper_installed():
             warn_group = Adw.PreferencesGroup()
             page.add(warn_group)
-            missing = "create_ap is not installed." if not hotspot.is_create_ap_installed() \
+            missing = (
+                "create_ap is not installed."
+                if not hotspot.is_create_ap_installed()
                 else "Run install.sh once with sudo before this will work."
-            warn_group.add(Adw.ActionRow(title="Setup needed", subtitle=f"{missing} See README.md."))
+            )
+            warn_group.add(
+                Adw.ActionRow(
+                    title="Setup needed", subtitle=f"{missing} See README.md."
+                )
+            )
 
         # ---- Basics ----
         basics = Adw.PreferencesGroup(title="Hotspot")
@@ -159,26 +197,42 @@ class HotspotWindow(Adw.ApplicationWindow):
 
         self.pass_row = Adw.PasswordEntryRow(title="Password")
         self.pass_row.set_text(self.settings.get_string("password"))
-        self.settings.bind("password", self.pass_row, "text", Gio.SettingsBindFlags.DEFAULT)
-        gen_btn = Gtk.Button(icon_name="view-refresh-symbolic", valign=Gtk.Align.CENTER,
-                              tooltip_text="Generate a random password")
-        gen_btn.connect("clicked", lambda _b: self.pass_row.set_text(hotspot.random_password(12)))
+        self.settings.bind(
+            "password", self.pass_row, "text", Gio.SettingsBindFlags.DEFAULT
+        )
+        gen_btn = Gtk.Button(
+            icon_name="view-refresh-symbolic",
+            valign=Gtk.Align.CENTER,
+            tooltip_text="Generate a random password",
+        )
+        gen_btn.connect(
+            "clicked", lambda _b: self.pass_row.set_text(hotspot.random_password(12))
+        )
         self.pass_row.add_suffix(gen_btn)
         basics.add(self.pass_row)
 
         self.psk_row = Adw.SwitchRow(
             title="Raw PSK",
-            subtitle="Treat password above as a 64 hex-digit pre-shared key (create_ap --psk)")
-        self.settings.bind("psk-mode", self.psk_row, "active", Gio.SettingsBindFlags.DEFAULT)
+            subtitle="Treat password above as a 64 hex-digit pre-shared key (create_ap --psk)",
+        )
+        self.settings.bind(
+            "psk-mode", self.psk_row, "active", Gio.SettingsBindFlags.DEFAULT
+        )
         basics.add(self.psk_row)
 
-        self.hidden_row = Adw.SwitchRow(title="Hidden network",
-                                         subtitle="Don't broadcast the SSID (create_ap --hidden)")
-        self.settings.bind("hidden", self.hidden_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.hidden_row = Adw.SwitchRow(
+            title="Hidden network",
+            subtitle="Don't broadcast the SSID (create_ap --hidden)",
+        )
+        self.settings.bind(
+            "hidden", self.hidden_row, "active", Gio.SettingsBindFlags.DEFAULT
+        )
         basics.add(self.hidden_row)
 
         # ---- Share ----
-        share = Adw.PreferencesGroup(title="Share", description="Scan with a phone camera to join")
+        share = Adw.PreferencesGroup(
+            title="Share", description="Scan with a phone camera to join"
+        )
         page.add(share)
         qr_row = Adw.ActionRow(title="QR code")
         qr_btn = Gtk.Button(label="Show QR Code", valign=Gtk.Align.CENTER)
@@ -190,74 +244,113 @@ class HotspotWindow(Adw.ApplicationWindow):
         radio = Adw.PreferencesGroup(title="Radio")
         page.add(radio)
 
-        self.wpa_row = Adw.ComboRow(title="WPA version",
-                                     model=Gtk.StringList.new(["WPA", "WPA2", "WPA + WPA2"]))
+        self.wpa_row = Adw.ComboRow(
+            title="WPA version", model=Gtk.StringList.new(["WPA", "WPA2", "WPA + WPA2"])
+        )
         self._wpa_map = ["1", "2", "1+2"]
         current = self.settings.get_string("wpa-version")
-        self.wpa_row.set_selected(max(0, self._wpa_map.index(current)) if current in self._wpa_map else 1)
-        self.wpa_row.connect("notify::selected", lambda r, _p:
-                              self.settings.set_string("wpa-version", self._wpa_map[r.get_selected()]))
+        self.wpa_row.set_selected(
+            max(0, self._wpa_map.index(current)) if current in self._wpa_map else 1
+        )
+        self.wpa_row.connect(
+            "notify::selected",
+            lambda r, _p: self.settings.set_string(
+                "wpa-version", self._wpa_map[r.get_selected()]
+            ),
+        )
         radio.add(self.wpa_row)
 
-        self.band_row = Adw.ComboRow(title="Frequency band",
-                                      model=Gtk.StringList.new(["2.4 GHz", "5 GHz"]))
+        self.band_row = Adw.ComboRow(
+            title="Frequency band", model=Gtk.StringList.new(["2.4 GHz", "5 GHz"])
+        )
         self._band_map = ["2.4", "5"]
         current = self.settings.get_string("band")
-        self.band_row.set_selected(self._band_map.index(current) if current in self._band_map else 0)
-        self.band_row.connect("notify::selected", lambda r, _p:
-                               self.settings.set_string("band", self._band_map[r.get_selected()]))
+        self.band_row.set_selected(
+            self._band_map.index(current) if current in self._band_map else 0
+        )
+        self.band_row.connect(
+            "notify::selected",
+            lambda r, _p: self.settings.set_string(
+                "band", self._band_map[r.get_selected()]
+            ),
+        )
         radio.add(self.band_row)
 
         adjustment = Gtk.Adjustment(lower=1, upper=165, step_increment=1)
         self.channel_row = Adw.SpinRow(title="Channel", adjustment=adjustment)
         self.channel_row.set_value(self.settings.get_int("channel"))
-        self.settings.bind("channel", self.channel_row, "value", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind(
+            "channel", self.channel_row, "value", Gio.SettingsBindFlags.DEFAULT
+        )
         radio.add(self.channel_row)
 
         self.mac_row = Adw.EntryRow(title="MAC address (optional)")
         self.mac_row.set_text(self.settings.get_string("mac-address"))
-        self.settings.bind("mac-address", self.mac_row, "text", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind(
+            "mac-address", self.mac_row, "text", Gio.SettingsBindFlags.DEFAULT
+        )
         radio.add(self.mac_row)
 
-        self.isolate_row = Adw.SwitchRow(title="Isolate clients",
-                                          subtitle="create_ap --isolate-clients")
-        self.settings.bind("isolate-clients", self.isolate_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.isolate_row = Adw.SwitchRow(
+            title="Isolate clients", subtitle="create_ap --isolate-clients"
+        )
+        self.settings.bind(
+            "isolate-clients", self.isolate_row, "active", Gio.SettingsBindFlags.DEFAULT
+        )
         radio.add(self.isolate_row)
 
         # ---- Device ----
         device = Adw.PreferencesGroup(
             title="Device",
             description='Leave "Internet from" on the same WiFi card (or empty) to keep using '
-                        "WiFi as a client while hosting the hotspot on the same card.")
+            "WiFi as a client while hosting the hotspot on the same card.",
+        )
         page.add(device)
 
         wifi_ifaces = hotspot.list_wifi_interfaces()
-        self.iface_row = Adw.ComboRow(title="WiFi interface (hosts the hotspot)",
-                                       model=Gtk.StringList.new(["(auto)"] + wifi_ifaces))
+        self.iface_row = Adw.ComboRow(
+            title="WiFi interface (hosts the hotspot)",
+            model=Gtk.StringList.new(["(auto)"] + wifi_ifaces),
+        )
         self._iface_items = ["(auto)"] + wifi_ifaces
         current = self.settings.get_string("wifi-interface")
-        self.iface_row.set_selected(self._iface_items.index(current) if current in self._iface_items else 0)
+        self.iface_row.set_selected(
+            self._iface_items.index(current) if current in self._iface_items else 0
+        )
         self.iface_row.connect("notify::selected", self._on_iface_changed)
         device.add(self.iface_row)
 
         all_ifaces = hotspot.list_all_interfaces()
         self._internet_items = ["", "none"] + all_ifaces
-        internet_labels = ["(same WiFi card — concurrent mode)", "none (no internet sharing)"] + all_ifaces
-        self.internet_row = Adw.ComboRow(title="Internet from",
-                                          model=Gtk.StringList.new(internet_labels))
+        internet_labels = [
+            "(same WiFi card — concurrent mode)",
+            "none (no internet sharing)",
+        ] + all_ifaces
+        self.internet_row = Adw.ComboRow(
+            title="Internet from", model=Gtk.StringList.new(internet_labels)
+        )
         current = self.settings.get_string("internet-interface")
         self.internet_row.set_selected(
-            self._internet_items.index(current) if current in self._internet_items else 0)
+            self._internet_items.index(current)
+            if current in self._internet_items
+            else 0
+        )
         self.internet_row.connect("notify::selected", self._on_internet_changed)
         device.add(self.internet_row)
 
-        self.novirt_row = Adw.SwitchRow(title="Disable virtual interface (--no-virt)",
-                                         subtitle="Only enable if your card can't do AP + client at once")
-        self.settings.bind("no-virt", self.novirt_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.novirt_row = Adw.SwitchRow(
+            title="Disable virtual interface (--no-virt)",
+            subtitle="Only enable if your card can't do AP + client at once",
+        )
+        self.settings.bind(
+            "no-virt", self.novirt_row, "active", Gio.SettingsBindFlags.DEFAULT
+        )
         device.add(self.novirt_row)
 
-        self.autostart_row = Adw.SwitchRow(title="Turn on automatically at login",
-                                            subtitle="Adds/removes an autostart entry")
+        self.autostart_row = Adw.SwitchRow(
+            title="Turn on automatically at login",
+            subtitle="Adds/removes an autostart entry",
+        )
         self.autostart_row.set_active(self.settings.get_boolean("autostart"))
         self.autostart_row.connect("notify::active", self._on_autostart_toggled)
         device.add(self.autostart_row)
@@ -265,12 +358,14 @@ class HotspotWindow(Adw.ApplicationWindow):
         # ---- Apply ----
         apply_group = Adw.PreferencesGroup(
             description="Changes take effect next time you turn the hotspot on. "
-                        'If it\'s already on, use "Apply Now" to restart it immediately '
-                        "with the new settings.")
+            'If it\'s already on, use "Apply Now" to restart it immediately '
+            "with the new settings."
+        )
         page.add(apply_group)
         apply_row = Adw.ActionRow(title="Apply changes to the running hotspot")
-        self.apply_btn = Gtk.Button(label="Apply Now", valign=Gtk.Align.CENTER,
-                                     css_classes=["suggested-action"])
+        self.apply_btn = Gtk.Button(
+            label="Apply Now", valign=Gtk.Align.CENTER, css_classes=["suggested-action"]
+        )
         self.apply_btn.connect("clicked", self._on_apply_now)
         apply_row.add_suffix(self.apply_btn)
         apply_group.add(apply_row)
@@ -316,7 +411,9 @@ class HotspotWindow(Adw.ApplicationWindow):
         self.settings.set_string("wifi-interface", "" if sel == "(auto)" else sel)
 
     def _on_internet_changed(self, row, _param):
-        self.settings.set_string("internet-interface", self._internet_items[row.get_selected()])
+        self.settings.set_string(
+            "internet-interface", self._internet_items[row.get_selected()]
+        )
 
     def _on_autostart_toggled(self, row, _param):
         active = row.get_active()
@@ -338,9 +435,13 @@ class HotspotWindow(Adw.ApplicationWindow):
         # once we return True. Skipping that in an earlier version is what
         # caused the switch to show the wrong lit/unlit color.
         if self._suppress_switch_signal:
-            return False  # programmatic sync from refresh(); let the default handler run
+            return (
+                False  # programmatic sync from refresh(); let the default handler run
+            )
         if self._busy:
-            switch.set_state(self._last_known_active)  # keep it visually pinned to the real state
+            switch.set_state(
+                self._last_known_active
+            )  # keep it visually pinned to the real state
             return True
         if state == self._last_known_active:
             switch.set_state(state)
@@ -357,12 +458,20 @@ class HotspotWindow(Adw.ApplicationWindow):
                 switch.set_state(self._last_known_active)
                 return True
             opts = self._build_start_options(ifname)
-            run_async(lambda: hotspot.start(opts), self._on_action_done, self._on_action_error)
+            run_async(
+                lambda: hotspot.start(opts), self._on_action_done, self._on_action_error
+            )
         else:
             ifname = self._current_ifname()
-            run_async(lambda: hotspot.stop(ifname), self._on_action_done, self._on_action_error)
+            run_async(
+                lambda: hotspot.stop(ifname),
+                self._on_action_done,
+                self._on_action_error,
+            )
 
-        return True  # we'll confirm the real state ourselves once refresh() reports back
+        return (
+            True  # we'll confirm the real state ourselves once refresh() reports back
+        )
 
     def _on_action_done(self, _result):
         self._busy = False
@@ -379,7 +488,9 @@ class HotspotWindow(Adw.ApplicationWindow):
 
     def _on_apply_now(self, _btn):
         if not self._last_known_active:
-            self._toast("Hotspot is off — turn it on first, then Apply Now restarts it with new settings")
+            self._toast(
+                "Hotspot is off — turn it on first, then Apply Now restarts it with new settings"
+            )
             return
         ifname = self._current_ifname()
         if not ifname:
@@ -400,8 +511,13 @@ class HotspotWindow(Adw.ApplicationWindow):
         run_async(lambda: hotspot.start(opts), done, error)
 
     def _on_show_qr(self, _btn):
-        QrDialog(self, self.settings.get_string("ssid"),
-                 self.settings.get_string("password"), self.settings.get_boolean("hidden"))
+        self._qr_dialog = QrDialog(
+            self,
+            self.settings.get_string("ssid"),
+            self.settings.get_string("password"),
+            self.settings.get_boolean("hidden"),
+        )
+        self._qr_dialog.present()
 
     # ---- status polling ----
 
@@ -448,7 +564,10 @@ class HotspotApp(Adw.Application):
 
 def autostart_desktop_path() -> "Path":
     from pathlib import Path
-    return Path(GLib.get_user_config_dir()) / "autostart" / f"{APP_ID}-autostart.desktop"
+
+    return (
+        Path(GLib.get_user_config_dir()) / "autostart" / f"{APP_ID}-autostart.desktop"
+    )
 
 
 def set_autostart_enabled(enabled: bool):
@@ -470,6 +589,7 @@ def set_autostart_enabled(enabled: bool):
 
 def shutil_which_self() -> str:
     import shutil
+
     found = shutil.which("hotspot-toggle")
     if found:
         return found
