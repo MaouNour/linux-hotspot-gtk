@@ -1,6 +1,6 @@
 # Hotspot Toggle — standalone GTK app
 
-Same functionality as the [GNOME Shell extension](../hotspot-toggle@maounour/)
+Same functionality as the [GNOME Shell extension](https://github.com/MaouNour/hotspot-gnome-extension)
 version — turn a `create_ap` hotspot on/off, configure SSID/password/hidden/
 PSK/WPA version/band/channel/MAC/isolation, share via QR code — but as a
 normal application window that works on **any desktop environment**: GNOME,
