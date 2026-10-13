@@ -1,0 +1,16 @@
+#!/usr/bin/python3
+"""hotspot-toggle launcher — CLI commands never import GTK."""
+import os
+import sys
+
+sys.path.insert(0, os.environ.get("HOTSPOT_TOGGLE_LIBDIR", "@APPDIR@"))
+
+import hotspot_toggle_cli
+
+rc = hotspot_toggle_cli.dispatch(sys.argv[1:])
+if rc is not None:
+    sys.exit(rc)
+
+import hotspot_toggle_gtk
+
+hotspot_toggle_gtk.main_gui()

@@ -1,0 +1,49 @@
+.TH HOTSPOT-TOGGLE 1 "" "hotspot-toggle" "User Commands"
+.SH NAME
+hotspot-toggle \- control a Wi-Fi hotspot (create_ap) from the GUI or the command line
+.SH SYNOPSIS
+.B hotspot-toggle
+[\fICOMMAND\fR] [\fIOPTIONS\fR]
+.SH DESCRIPTION
+With no command, opens the GTK4 window. Settings saved in the window are used as
+defaults by every command. Run it as your normal user, not with sudo; privileged
+operations go through pkexec.
+.SH COMMANDS
+.TP
+.BR enable " (" on ", " start )
+Turn the hotspot on. Options: \fB\-\-ssid\fR, \fB\-\-password\fR, \fB\-\-band\fR 2.4|5,
+\fB\-\-channel\fR, \fB\-\-internet\fR \fIIFACE\fR, \fB\-\-restart\fR.
+.TP
+.BR disable " (" off ", " stop )
+Turn the hotspot off.
+.TP
+.B toggle
+Turn it off if it is on, otherwise on.
+.TP
+.B status
+Print \fBonline\fR or \fBoffline\fR. Exit status 0 if online, 3 if offline.
+\fB\-v\fR adds SSID and device count; \fB\-q\fR prints nothing; \fB\-\-json\fR prints JSON.
+.TP
+.BR info " (" watch )
+Live view of connected devices (MAC, IP, name, signal, time online, traffic),
+the device count, total traffic since the hotspot started and the current speed.
+Press \fBq\fR or Ctrl-C to quit. \fB\-n\fR \fISEC\fR sets the refresh interval,
+\fB\-\-once\fR prints one snapshot, \fB\-\-json\fR prints one JSON object per
+refresh, \fB\-\-no\-auth\fR never asks for privileges (device names may then be
+missing).
+.TP
+.B gui
+Open the window (same as no command).
+.SH OPTIONS
+.TP
+.BR \-i ", " \-\-interface " " \fIIFACE\fR
+Wi-Fi interface to use (default: saved setting, else the first Wi-Fi card).
+.SH EXIT STATUS
+0 success/online, 1 error, 2 usage error, 3 offline (\fBstatus\fR, \fBinfo \-\-once\fR).
+.SH FILES
+.TP
+.I /usr/bin/gnome-hotspot-helper
+Root helper started through pkexec; supervises create_ap as the systemd unit
+\fBgnome-hotspot-\fIIFACE\fB.service\fR.
+.SH SEE ALSO
+create_ap(1), pkexec(1), systemctl(1)

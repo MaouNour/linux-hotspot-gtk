@@ -32,16 +32,36 @@ set -euo pipefail
 STATE_DIR=/run/gnome-hotspot-toggle
 STATUS_FILE="$STATE_DIR/status.json"
 LOCK_FILE="$STATE_DIR/lock"
-mkdir -p "$STATE_DIR"
-chmod 755 "$STATE_DIR"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 # Still worth serializing our own start/stop calls even with systemd doing
 # the heavy lifting underneath — avoids two pkexec invocations racing on
-# the reset-failed/systemd-run sequence itself.
-exec 9>"$LOCK_FILE"
-flock -w 20 9 || die "another hotspot start/stop is already in progress, try again in a moment"
+# the reset-failed/systemd-run sequence itself. (Read-only subcommands such
+# as `leases` don't take the lock, so live monitoring never blocks a toggle.)
+take_lock() {
+    mkdir -p "$STATE_DIR"
+    chmod 755 "$STATE_DIR"
+    exec 9>"$LOCK_FILE"
+    flock -w 20 9 || die "another hotspot start/stop is already in progress, try again in a moment"
+}
+
+# Locate create_ap. pkexec resets PATH to /usr/sbin:/usr/bin:/sbin:/bin, so
+# /usr/local/bin has to be checked explicitly, and the distro packages /
+# AppImage setup bundle a private copy that never clashes with a system one.
+resolve_create_ap() {
+    local p
+    for p in "$(command -v create_ap 2>/dev/null || true)" \
+             /usr/local/bin/create_ap \
+             /usr/local/lib/hotspot-toggle/create_ap \
+             /usr/lib/hotspot-toggle/create_ap; do
+        if [[ -n "$p" && -x "$p" ]]; then
+            echo "$p"
+            return 0
+        fi
+    done
+    return 1
+}
 
 is_iface() {
     local ifname=$1
@@ -89,6 +109,7 @@ stop_unit() {
 }
 
 cmd_start() {
+    take_lock
     local ifname="" internet="" ssid="" password="" channel="1" wpa="2"
     local band="2.4" hidden="0" psk="0" novirt="0" isolate="0" mac=""
 
@@ -137,7 +158,8 @@ cmd_start() {
         [[ "$mac" =~ ^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$ ]] || die "bad MAC address"
     fi
 
-    command -v create_ap >/dev/null 2>&1 || die "create_ap is not installed (see README)"
+    local create_ap_bin
+    create_ap_bin=$(resolve_create_ap) || die "create_ap is not installed (see README)"
     command -v systemd-run >/dev/null 2>&1 || die "systemd-run not found; this helper requires systemd"
 
     local unit; unit=$(unit_name "$ifname")
@@ -172,7 +194,7 @@ cmd_start() {
         --description="GNOME Hotspot ($ifname)" \
         --collect \
         --property=Restart=no \
-        /usr/bin/env create_ap "${args[@]}"
+        "$create_ap_bin" "${args[@]}"
 
     # Give hostapd/dnsmasq a moment to come up so status right after
     # toggling reflects reality instead of a still-starting unit.
@@ -188,6 +210,7 @@ cmd_start() {
 }
 
 cmd_stop() {
+    take_lock
     local ifname=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -202,8 +225,33 @@ cmd_stop() {
     echo "stopped"
 }
 
+# Print create_ap's dnsmasq lease file(s) for an interface so unprivileged
+# monitoring (`hotspot-toggle info`) can show device names. The lease files
+# live in root-only temp dirs created by create_ap. /tmp is world-writable,
+# so only read directories/files that are (a) not symlinks and (b) owned by
+# root — otherwise a local user could plant a symlink and read any file.
+cmd_leases() {
+    local ifname=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --ifname) ifname=$2; shift 2 ;;
+            *) die "unknown option $1" ;;
+        esac
+    done
+    is_iface "$ifname" || die "invalid interface: $ifname"
+
+    local d f
+    for d in /tmp/create_ap."$ifname".conf.*; do
+        [[ -d "$d" && ! -L "$d" && "$(stat -c %u "$d")" == "0" ]] || continue
+        f="$d/dnsmasq.leases"
+        [[ -f "$f" && ! -L "$f" && "$(stat -c %u "$f")" == "0" ]] || continue
+        cat -- "$f"
+    done
+}
+
 case "${1:-}" in
     start) shift; cmd_start "$@" ;;
     stop) shift; cmd_stop "$@" ;;
-    *) die "usage: $0 {start|stop} [options]" ;;
+    leases) shift; cmd_leases "$@" ;;
+    *) die "usage: $0 {start|stop|leases} [options]" ;;
 esac

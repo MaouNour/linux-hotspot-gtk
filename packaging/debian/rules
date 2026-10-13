@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_clean:
+override_dh_auto_build:
+override_dh_auto_test:
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/hotspot-toggle PREFIX=/usr BUNDLE_CREATE_AP=1
+	rm -f debian/hotspot-toggle/usr/share/doc/hotspot-toggle/README.md
+	desktop-file-validate debian/hotspot-toggle/usr/share/applications/io.github.local.hotspot-toggle.desktop

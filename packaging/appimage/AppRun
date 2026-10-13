@@ -1,0 +1,65 @@
+#!/bin/bash
+# AppRun — entry point of the Hotspot Toggle AppImage.
+#
+# The app itself runs from the AppImage, but a hotspot needs root-level pieces
+# that cannot live inside a read-only, per-user mount: the root helper, its
+# polkit policy, create_ap (referenced by a systemd unit that outlives this
+# process) and the distro packages (hostapd, dnsmasq, GTK4, ...). On first run
+# — and whenever something is missing or outdated — this script installs them
+# once, through a single pkexec password prompt.
+#
+#   ./Hotspot-Toggle.AppImage            open the GUI
+#   ./Hotspot-Toggle.AppImage status     CLI (enable|disable|toggle|status|info)
+#   ./Hotspot-Toggle.AppImage --setup    force the one-time system setup
+#   HOTSPOT_SKIP_SETUP=1 ...             never run the setup check
+HERE="$(dirname "$(readlink -f "${0}")")"
+SYS="$HERE/usr/share/hotspot-toggle/system"
+
+export HOTSPOT_TOGGLE_LIBDIR="$HERE/usr/share/hotspot-toggle"
+export GSETTINGS_SCHEMA_DIR="$HERE/usr/share/glib-2.0/schemas${GSETTINGS_SCHEMA_DIR:+:$GSETTINGS_SCHEMA_DIR}"
+# Debian-family distros keep hostapd/dnsmasq/iw in /usr/sbin, off a user's PATH.
+export PATH="$PATH:/usr/sbin:/sbin"
+
+# shellcheck source=/dev/null
+source "$SYS/deps.sh"
+
+needs_setup() {
+    # The root helper: either a distro package put it in /usr/bin, or our
+    # copy must be present and identical in /usr/local/bin.
+    if [[ ! -x /usr/bin/gnome-hotspot-helper ]]; then
+        [[ -x /usr/local/bin/gnome-hotspot-helper ]] \
+            && cmp -s "$SYS/gnome-hotspot-helper" /usr/local/bin/gnome-hotspot-helper \
+            || return 0
+    fi
+    local c
+    for c in hostapd dnsmasq iw ip iptables pkexec systemd-run; do
+        command -v "$c" >/dev/null 2>&1 || return 0
+    done
+    if [[ $# -eq 0 || "$1" == gui ]]; then
+        hs_gui_stack_ok || return 0
+    fi
+    return 1
+}
+
+run_setup() {
+    # Root cannot read a user's FUSE mount, so stage the payload in a temp dir.
+    local tmp rc
+    tmp=$(mktemp -d)
+    cp -r "$SYS"/. "$tmp"/
+    echo "Hotspot Toggle: one-time system setup (installs dependencies, root helper and polkit policy)..." >&2
+    pkexec /bin/bash "$tmp/setup.sh"
+    rc=$?
+    rm -rf "$tmp"
+    return $rc
+}
+
+if [[ "${1:-}" == "--setup" ]]; then
+    run_setup
+    exit $?
+fi
+
+if [[ -z "${HOTSPOT_SKIP_SETUP:-}" ]] && needs_setup "$@"; then
+    run_setup || echo "Hotspot Toggle: setup was not completed — some features may not work (retry with --setup)." >&2
+fi
+
+exec python3 "$HERE/usr/bin/hotspot-toggle" "$@"

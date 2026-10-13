@@ -1,0 +1,48 @@
+# Reusable: builds the source tarball and every package format in clean
+# containers, using the same scripts you can run locally (packaging/build.sh).
+name: Build packages
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source tarball (includes pinned create_ap snapshot)
+        run: make dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: dist/hotspot-toggle-*.tar.gz
+          if-no-files-found: error
+
+  package:
+    needs: source
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        fmt: [deb, rpm, arch, appimage]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+          path: dist
+      - name: Build ${{ matrix.fmt }}
+        run: packaging/build.sh ${{ matrix.fmt }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.fmt }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+            dist/*.AppImage
+          if-no-files-found: error

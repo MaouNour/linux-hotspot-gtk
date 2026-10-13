@@ -1,9 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=Hotspot
-Comment=Turn your WiFi hotspot on/off and configure it
+Comment=Turn your Wi-Fi hotspot on/off and configure it
 Exec=hotspot-toggle
-Icon=network-wireless-hotspot-symbolic
+Icon=io.github.local.hotspot-toggle
 Terminal=false
-Categories=Network;Settings;
+Categories=Network;
+Keywords=hotspot;wifi;wi-fi;access point;tethering;create_ap;
 StartupNotify=true
+StartupWMClass=io.github.local.hotspot-toggle

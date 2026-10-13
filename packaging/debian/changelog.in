@@ -1,0 +1,5 @@
+hotspot-toggle (@VERSION@) unstable; urgency=medium
+
+  * Release @VERSION@.
+
+ -- MaouNour <noreply@users.noreply.github.com>  @DEBDATE@

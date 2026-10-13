@@ -1,0 +1,35 @@
+Source: hotspot-toggle
+Section: net
+Priority: optional
+Maintainer: MaouNour <noreply@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), desktop-file-utils
+Standards-Version: 4.6.2
+Homepage: https://github.com/MaouNour/hotspot-toggle-gtk
+Rules-Requires-Root: no
+
+Package: hotspot-toggle
+Architecture: all
+Depends: ${misc:Depends},
+ python3,
+ python3-gi,
+ gir1.2-gtk-4.0,
+ gir1.2-adw-1 (>= 1.4),
+ pkexec | policykit-1,
+ systemd,
+ bash,
+ util-linux,
+ procps,
+ hostapd,
+ iproute2,
+ iw,
+ wireless-tools,
+ haveged,
+ dnsmasq,
+ iptables,
+ qrencode
+Description: GTK4 Wi-Fi hotspot toggle with a command-line interface
+ Turn a create_ap Wi-Fi hotspot on and off from a GTK4/libadwaita window or
+ from the terminal (hotspot-toggle enable|disable|toggle|status|info).
+ Includes a live view of connected devices and traffic, QR-code sharing, and
+ a root helper that supervises create_ap as a systemd unit. create_ap is
+ bundled privately, so it does not clash with a system-wide copy.

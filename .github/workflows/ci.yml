@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install linters
+        run: sudo apt-get update && sudo apt-get install -y shellcheck desktop-file-utils
+      - name: Python compiles
+        run: python3 -m py_compile create_ap_helper.py hotspot_toggle_cli.py hotspot_toggle_gtk.py
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: shellcheck
+        run: shellcheck -x install.sh scripts/deps.sh bin/gnome-hotspot-helper packaging/*.sh packaging/appimage/AppRun packaging/appimage/setup.sh
+      - name: Validate desktop entry
+        run: desktop-file-validate data/io.github.local.hotspot-toggle.desktop
+
+  packages:
+    needs: lint-and-test
+    uses: ./.github/workflows/build.yml

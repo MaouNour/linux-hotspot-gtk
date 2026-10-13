@@ -1,0 +1,25 @@
+# bash completion for hotspot-toggle
+_hotspot_toggle() {
+    local cur prev cmd
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    cmd="${COMP_WORDS[1]:-}"
+
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "enable disable toggle status info gui on off start stop watch --help --version" -- "$cur") )
+        return
+    fi
+    case "$prev" in
+        -i|--interface|--internet)
+            COMPREPLY=( $(compgen -W "$(ls /sys/class/net 2>/dev/null)" -- "$cur") ); return ;;
+        --band) COMPREPLY=( $(compgen -W "2.4 5" -- "$cur") ); return ;;
+    esac
+    case "$cmd" in
+        enable|on|start|toggle)
+            COMPREPLY=( $(compgen -W "-i --interface --ssid --password --band --channel --internet --restart" -- "$cur") ) ;;
+        disable|off|stop)  COMPREPLY=( $(compgen -W "-i --interface" -- "$cur") ) ;;
+        status)            COMPREPLY=( $(compgen -W "-i --interface --json -v --verbose -q --quiet" -- "$cur") ) ;;
+        info|watch)        COMPREPLY=( $(compgen -W "-i --interface -n --interval --once --json --no-auth" -- "$cur") ) ;;
+    esac
+}
+complete -F _hotspot_toggle hotspot-toggle

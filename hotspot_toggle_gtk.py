@@ -178,7 +178,7 @@ class HotspotWindow(Adw.ApplicationWindow):
             missing = (
                 "create_ap is not installed."
                 if not hotspot.is_create_ap_installed()
-                else "Run install.sh once with sudo before this will work."
+                else "Run ./install.sh once before this will work."
             )
             warn_group.add(
                 Adw.ActionRow(
@@ -596,43 +596,20 @@ def shutil_which_self() -> str:
     return sys.argv[0]
 
 
-def run_headless_autostart():
-    """--autostart: turn the hotspot on using saved settings and exit,
-    without showing a window. Used by the autostart .desktop entry."""
-    settings = Gio.Settings.new(SCHEMA_ID)
-    if not settings.get_boolean("autostart"):
-        return 0
-    ifname = settings.get_string("wifi-interface") or hotspot.default_wifi_interface()
-    if not ifname:
-        print("hotspot-toggle --autostart: no WiFi interface found", file=sys.stderr)
-        return 1
-    opts = hotspot.StartOptions(
-        ifname=ifname,
-        internet=settings.get_string("internet-interface"),
-        ssid=settings.get_string("ssid") or "hotspot",
-        password=settings.get_string("password"),
-        psk_mode=settings.get_boolean("psk-mode"),
-        hidden=settings.get_boolean("hidden"),
-        wpa_version=settings.get_string("wpa-version"),
-        band=settings.get_string("band"),
-        channel=settings.get_int("channel"),
-        mac=settings.get_string("mac-address"),
-        no_virt=settings.get_boolean("no-virt"),
-        isolate_clients=settings.get_boolean("isolate-clients"),
-    )
-    try:
-        hotspot.start(opts)
-    except hotspot.HotspotError as e:
-        print(f"hotspot-toggle --autostart: {e}", file=sys.stderr)
-        return 1
-    return 0
+def main_gui():
+    app = HotspotApp()
+    sys.exit(app.run(sys.argv[:1]))
 
 
 def main():
-    if "--autostart" in sys.argv:
-        sys.exit(run_headless_autostart())
-    app = HotspotApp()
-    sys.exit(app.run(sys.argv))
+    # Allow `python3 hotspot_toggle_gtk.py status` etc. too; the installed
+    # `hotspot-toggle` launcher does this *before* importing GTK.
+    from hotspot_toggle_cli import dispatch
+
+    rc = dispatch(sys.argv[1:])
+    if rc is not None:
+        sys.exit(rc)
+    main_gui()
 
 
 if __name__ == "__main__":

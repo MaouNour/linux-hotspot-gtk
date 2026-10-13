@@ -1,0 +1,27 @@
+# Maintainer: MaouNour <noreply@users.noreply.github.com>
+pkgname=hotspot-toggle
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='GTK4 Wi-Fi hotspot toggle (create_ap) with a command-line interface'
+arch=('any')
+url='https://github.com/MaouNour/hotspot-toggle-gtk'
+license=('MIT')  # NOTE: confirm the license before publishing
+depends=('python' 'python-gobject' 'gtk4' 'libadwaita>=1.4' 'polkit' 'systemd'
+         'bash' 'util-linux' 'procps-ng' 'hostapd' 'iproute2' 'iw'
+         'wireless_tools' 'haveged' 'dnsmasq' 'iptables' 'qrencode')
+makedepends=('make' 'desktop-file-utils')
+backup=('etc/polkit-1/rules.d/49-hotspot-toggle.rules')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')  # local tarball produced by `make dist`
+
+check() {
+  cd "$pkgname-$pkgver"
+  python -m unittest discover -s tests
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  make install DESTDIR="$pkgdir" PREFIX=/usr BUNDLE_CREATE_AP=1
+  rm -f "$pkgdir/usr/share/doc/$pkgname/README.md"
+  desktop-file-validate "$pkgdir/usr/share/applications/io.github.local.hotspot-toggle.desktop"
+}
