@@ -19,7 +19,7 @@ case "$fmt" in
         export DEBIAN_FRONTEND=noninteractive
         apt-get update
         apt-get install -y --no-install-recommends build-essential libglib2.0-bin \
-            desktop-file-utils ca-certificates curl git
+            desktop-file-utils ca-certificates curl git file
         packaging/build-appimage.sh ;;
     rpm)
         dnf install -y rpm-build make desktop-file-utils git tar gzip
